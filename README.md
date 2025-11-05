@@ -210,10 +210,44 @@ pharmachain/
 
 ## Security Notes
 
+### For Development/Demo Use
+
+This MVP implementation is designed for development, testing, and educational purposes. Key security features:
+
+- ✅ Supabase authentication with email/password
+- ✅ User roles stored in dedicated `user_profiles` table with Row Level Security
+- ✅ Users cannot modify their own roles after signup
+- ✅ SHA-256 blockchain verification for data integrity
+- ⚠️ Users self-select roles during signup (acceptable for demos, not for production)
+
+### Production Deployment
+
+⚠️ **Important:** Before deploying to production, especially for pharmaceutical or healthcare use:
+
+1. **Read `SECURITY.md`** - Comprehensive security guide with:
+   - Admin approval workflow implementation
+   - Invitation-based signup system
+   - Compliance guidelines (HIPAA, FDA 21 CFR Part 11, GDPR)
+   - API security and rate limiting
+   - Audit logging implementation
+
+2. **Implement Role Approval:** Users should not self-assign roles in production. See SECURITY.md for four different approaches.
+
+3. **Compliance Requirements:** Pharmaceutical systems require:
+   - FDA 21 CFR Part 11 compliance for electronic records
+   - HIPAA compliance if handling patient data
+   - Regular security audits and validation
+   - Audit trails and digital signatures
+
+### Basic Security Practices
+
 - Never commit `.env` file to version control
 - Keep Supabase credentials secure
 - Use environment variables for all secrets
-- In production, use row-level security policies in Supabase
+- Rotate API keys regularly
+- Use HTTPS only in production
+- Implement rate limiting on public APIs
+- Regular security assessments
 
 ## License
 

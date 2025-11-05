@@ -33,6 +33,8 @@ def init_session_state():
         st.session_state.user_email = None
     if 'user_role' not in st.session_state:
         st.session_state.user_role = None
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = None
 
 def login_page():
     st.title("🔐 PharmaChain Login")
@@ -48,7 +50,6 @@ def login_page():
             with st.form("login_form"):
                 email = st.text_input("Email", placeholder="user@pharmachain.com")
                 password = st.text_input("Password", type="password")
-                role = st.selectbox("Role", ["Manufacturer", "FDA", "Distributor", "Pharmacy"])
                 
                 submitted = st.form_submit_button("Login", use_container_width=True)
                 
@@ -61,11 +62,18 @@ def login_page():
                             })
                             
                             if response.user:
-                                st.session_state.authenticated = True
-                                st.session_state.user_email = email
-                                st.session_state.user_role = role
-                                st.success(f"✓ Welcome back, {role}!")
-                                st.rerun()
+                                profile_response = supabase.table("user_profiles").select("role").eq("id", response.user.id).execute()
+                                
+                                if not profile_response.data or len(profile_response.data) == 0:
+                                    st.error("Account setup incomplete. Please create a new account with a role assigned.")
+                                else:
+                                    user_role = profile_response.data[0]["role"]
+                                    st.session_state.authenticated = True
+                                    st.session_state.user_email = email
+                                    st.session_state.user_role = user_role
+                                    st.session_state.user_id = response.user.id
+                                    st.success(f"✓ Welcome back, {user_role}!")
+                                    st.rerun()
                             else:
                                 st.error("Invalid credentials")
                         except Exception as e:
@@ -96,7 +104,16 @@ def login_page():
                                 })
                                 
                                 if response.user:
-                                    st.success("✓ Account created successfully! Please log in.")
+                                    try:
+                                        profile_data = {
+                                            "id": response.user.id,
+                                            "email": new_email,
+                                            "role": new_role
+                                        }
+                                        supabase.table("user_profiles").insert(profile_data).execute()
+                                        st.success(f"✓ Account created successfully as {new_role}! Please log in.")
+                                    except Exception as profile_error:
+                                        st.error(f"Account created but role assignment failed: {str(profile_error)}")
                                 else:
                                     st.error("Account creation failed")
                             except Exception as e:

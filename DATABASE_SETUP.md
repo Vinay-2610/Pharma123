@@ -69,6 +69,46 @@ CREATE TABLE alerts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Table 3: User Profiles
+-- Stores user roles with Row Level Security for secure role-based access control
+CREATE TABLE user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('Manufacturer', 'FDA', 'Distributor', 'Pharmacy')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security on user_profiles
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Users can only read their own profile (cannot update or delete)
+CREATE POLICY "Users can view own profile"
+    ON user_profiles
+    FOR SELECT
+    USING (auth.uid() = id);
+
+-- Only authenticated users can insert their own profile (once during signup)
+CREATE POLICY "Users can insert own profile"
+    ON user_profiles
+    FOR INSERT
+    WITH CHECK (auth.uid() = id);
+
+-- Function to automatically update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update updated_at on user_profiles
+CREATE TRIGGER update_user_profiles_updated_at
+    BEFORE UPDATE ON user_profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- =====================================================
 -- Indexes for Better Performance
 -- =====================================================
