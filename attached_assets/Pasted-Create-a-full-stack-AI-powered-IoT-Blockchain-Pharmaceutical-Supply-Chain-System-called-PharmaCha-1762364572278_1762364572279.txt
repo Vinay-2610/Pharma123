@@ -1,0 +1,70 @@
+Create a full-stack AI-powered IoT + Blockchain Pharmaceutical Supply Chain System called “PharmaChain” using the following technologies:
+
+Backend: FastAPI (Python 3.13 compatible)
+Database: Supabase (for IoT data and authentication)
+Frontend: Streamlit (for all user dashboards)
+IoT Simulation: Python script to send fake sensor readings
+Blockchain Simulation: SHA-256 hashing for data integrity verification
+Authentication: Supabase Auth (Email + Password login)
+Visualization: Plotly and Pandas for charts
+
+System Description:
+PharmaChain is a smart supply chain monitoring system that uses IoT sensors to track real-time temperature and humidity of medicine batches during transportation and storage. Data is stored securely in Supabase and visualized through Streamlit dashboards for different users (Manufacturer, FDA, Distributor, and Pharmacy). Each IoT record is hashed using SHA-256 to simulate blockchain-based tamper-proof verification.
+
+Project Structure:
+pharmachain/
+├── backend/
+│ ├── main.py (FastAPI backend)
+│ ├── supabase_config.py (Supabase connection)
+│ ├── requirements.txt
+│ └── .env (Supabase credentials)
+│
+├── dashboard/
+│ ├── app.py (Streamlit dashboard)
+│ ├── requirements.txt
+│ └── .streamlit/
+│ └── secrets.toml (Supabase frontend credentials)
+│
+└── simulator/
+└── send_data.py (IoT data simulator)
+
+Features:
+
+Real-time IoT data collection via FastAPI backend.
+
+Automatic alert generation if temperature is out of safe range.
+
+Blockchain hash simulation to verify integrity of every record.
+
+Role-based Streamlit dashboards for:
+
+Manufacturer: IoT data + charts
+
+FDA: Alerts + blockchain verification
+
+Distributor: Shipment monitoring
+
+Pharmacy: Batch verification
+
+Secure authentication using Supabase Auth with email and password.
+
+Frontend powered by Streamlit with live data fetched from FastAPI backend.
+
+IoT data simulated using a separate Python script that sends readings periodically.
+
+Expected Outcome:
+A fully working end-to-end IoT-based PharmaChain monitoring system where each stakeholder logs in using Supabase Auth and views a live dashboard according to their role. IoT data is inserted into Supabase through FastAPI and visualized on Streamlit in real time. FDA users can run blockchain verification to confirm data integrity.
+
+Deliverables:
+
+FastAPI backend connected to Supabase
+
+Streamlit dashboard with role-based views
+
+IoT data simulator
+
+Supabase authentication integration
+
+Blockchain verification endpoint (/verify)
+
+Ready-to-run structure compatible with Replit (Python 3.13)
