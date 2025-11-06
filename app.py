@@ -6,6 +6,10 @@ import plotly.graph_objects as go
 from datetime import datetime
 import os
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 BACKEND_URL = "http://localhost:8000"
 
@@ -72,12 +76,31 @@ def login_page():
                                     st.session_state.user_email = email
                                     st.session_state.user_role = user_role
                                     st.session_state.user_id = response.user.id
+                                    
+                                    # Log login to audit trail
+                                    try:
+                                        requests.post(f"{BACKEND_URL}/audit/log", 
+                                                    json={
+                                                        "user_email": email,
+                                                        "role": user_role,
+                                                        "action": "User Login",
+                                                        "details": {"login_time": datetime.now().isoformat()}
+                                                    },
+                                                    timeout=5)
+                                    except:
+                                        pass
+                                    
                                     st.success(f"✓ Welcome back, {user_role}!")
                                     st.rerun()
                             else:
                                 st.error("Invalid credentials")
                         except Exception as e:
-                            st.error(f"Login failed: {str(e)}")
+                            error_msg = str(e)
+                            if "Email not confirmed" in error_msg:
+                                st.error("⚠️ Email not confirmed. Please check Supabase settings:")
+                                st.info("Go to Supabase Dashboard → Authentication → Providers → Email → Disable 'Confirm email'")
+                            else:
+                                st.error(f"Login failed: {error_msg}")
                     else:
                         st.warning("Please enter email and password")
         
@@ -135,6 +158,69 @@ def fetch_data(endpoint):
 def manufacturer_dashboard():
     st.title("🏭 Manufacturer Dashboard")
     st.markdown("### Real-time IoT Data & Analytics")
+    
+    # Add Create New Shipment Section
+    with st.expander("📦 Create New Shipment", expanded=False):
+        st.markdown("### Register a New Pharmaceutical Batch")
+        with st.form("new_shipment_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                batch_id = st.text_input("Batch ID*", placeholder="e.g., BATCH-2025-005")
+                product_name = st.text_input("Product Name*", placeholder="e.g., Insulin Vials")
+                quantity = st.number_input("Quantity (units)*", min_value=1, value=1000, step=100)
+                manufacturing_date = st.date_input("Manufacturing Date*")
+            
+            with col2:
+                expiry_date = st.date_input("Expiry Date*")
+                location = st.text_input("Initial Location*", placeholder="e.g., Manufacturing Plant - Mumbai")
+                temperature = st.number_input("Initial Temperature (°C)", min_value=-10.0, max_value=50.0, value=5.0, step=0.1)
+                humidity = st.number_input("Initial Humidity (%)", min_value=0.0, max_value=100.0, value=45.0, step=1.0)
+            
+            submit_shipment = st.form_submit_button("🚀 Create Batch & Submit for FDA Approval", use_container_width=True)
+            
+            if submit_shipment:
+                if batch_id and product_name and location:
+                    try:
+                        # Create batch record
+                        batch_data = {
+                            "batch_id": batch_id,
+                            "manufacturer_email": st.session_state.user_email,
+                            "product_name": product_name,
+                            "quantity": quantity,
+                            "manufacturing_date": str(manufacturing_date),
+                            "expiry_date": str(expiry_date),
+                            "initial_location": location
+                        }
+                        
+                        response = requests.post(f"{BACKEND_URL}/batch/create", 
+                                               json=batch_data,
+                                               timeout=10)
+                        
+                        if response.status_code == 200:
+                            # Also create initial IoT reading
+                            iot_data = {
+                                "batch_id": batch_id,
+                                "temperature": temperature,
+                                "humidity": humidity,
+                                "location": location,
+                                "sensor_id": f"SENSOR-MFG-{batch_id[-3:]}",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                            
+                            requests.post(f"{BACKEND_URL}/iot/data", json=iot_data, timeout=10)
+                            
+                            st.success(f"✅ Batch {batch_id} created and submitted for FDA approval!")
+                            st.info("📋 Status: Pending FDA Review")
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to create batch: {response.text}")
+                    except Exception as e:
+                        st.error(f"Error creating batch: {str(e)}")
+                else:
+                    st.warning("Please fill in all required fields (*)")
+    
+    st.markdown("---")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -210,6 +296,96 @@ def fda_dashboard():
     st.title("🏛️ FDA Regulatory Dashboard")
     st.markdown("### Compliance Monitoring & Blockchain Verification")
     
+    # Batch Approval Section
+    st.subheader("📋 Pending Batch Approvals")
+    pending_batches = fetch_data("/batch/pending")
+    
+    if pending_batches and pending_batches.get("batches") and len(pending_batches["batches"]) > 0:
+        for batch in pending_batches["batches"]:
+            with st.expander(f"🔍 {batch['batch_id']} - {batch['product_name']} ({batch['quantity']} units)", expanded=True):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.write(f"**Manufacturer:** {batch['manufacturer_email']}")
+                    st.write(f"**Product:** {batch['product_name']}")
+                    st.write(f"**Quantity:** {batch['quantity']} units")
+                
+                with col2:
+                    st.write(f"**Mfg Date:** {batch['manufacturing_date']}")
+                    st.write(f"**Expiry Date:** {batch['expiry_date']}")
+                    st.write(f"**Location:** {batch['initial_location']}")
+                
+                with col3:
+                    st.write(f"**Status:** {batch['status'].upper()}")
+                    st.write(f"**Submitted:** {batch['created_at'][:10]}")
+                
+                st.markdown("---")
+                
+                # Verify blockchain integrity
+                verify_response = fetch_data(f"/verify/batch/{batch['batch_id']}")
+                if verify_response:
+                    if verify_response.get('is_valid'):
+                        st.success(f"✅ Blockchain Verified: {verify_response.get('integrity_percentage', 0):.1f}% integrity")
+                    else:
+                        st.error(f"⚠️ Blockchain Warning: {verify_response.get('invalid_records', 0)} tampered records detected!")
+                
+                # Approval/Rejection Form
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    remarks = st.text_area(f"FDA Remarks for {batch['batch_id']}", 
+                                          placeholder="Enter approval/rejection remarks...",
+                                          key=f"remarks_{batch['batch_id']}")
+                
+                with col2:
+                    st.write("")
+                    st.write("")
+                    if st.button("✅ Approve", key=f"approve_{batch['batch_id']}", type="primary", use_container_width=True):
+                        if remarks:
+                            try:
+                                approval_data = {
+                                    "batch_id": batch['batch_id'],
+                                    "approved": True,
+                                    "fda_email": st.session_state.user_email,
+                                    "remarks": remarks
+                                }
+                                response = requests.post(f"{BACKEND_URL}/batch/approve", 
+                                                       json=approval_data, timeout=10)
+                                if response.status_code == 200:
+                                    st.success(f"✅ Batch {batch['batch_id']} approved!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Error: {response.text}")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
+                        else:
+                            st.warning("Please enter remarks")
+                    
+                    if st.button("❌ Reject", key=f"reject_{batch['batch_id']}", use_container_width=True):
+                        if remarks:
+                            try:
+                                approval_data = {
+                                    "batch_id": batch['batch_id'],
+                                    "approved": False,
+                                    "fda_email": st.session_state.user_email,
+                                    "remarks": remarks
+                                }
+                                response = requests.post(f"{BACKEND_URL}/batch/approve", 
+                                                       json=approval_data, timeout=10)
+                                if response.status_code == 200:
+                                    st.error(f"❌ Batch {batch['batch_id']} rejected!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Error: {response.text}")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
+                        else:
+                            st.warning("Please enter rejection reason")
+    else:
+        st.info("✅ No pending batches for approval")
+    
+    st.markdown("---")
+    
     alerts_data = fetch_data("/alerts?limit=100")
     
     col1, col2, col3 = st.columns(3)
@@ -233,7 +409,7 @@ def fda_dashboard():
     
     st.markdown("---")
     
-    tab1, tab2 = st.tabs(["⚠️ Active Alerts", "🔐 Blockchain Verification"])
+    tab1, tab2, tab3, tab4 = st.tabs(["⚠️ Active Alerts", "🔐 Blockchain Verification", "🔗 Blockchain Explorer", "📋 Audit Logs"])
     
     with tab1:
         st.subheader("Active Temperature Alerts")
@@ -273,6 +449,22 @@ def fda_dashboard():
                     if response.status_code == 200:
                         result = response.json()
                         
+                        # Log verification to audit trail
+                        try:
+                            requests.post(f"{BACKEND_URL}/audit/log", 
+                                        json={
+                                            "user_email": st.session_state.user_email,
+                                            "role": st.session_state.user_role,
+                                            "action": "Verified Blockchain Hash",
+                                            "details": {
+                                                "record_id": record_id,
+                                                "is_valid": result["is_valid"]
+                                            }
+                                        },
+                                        timeout=5)
+                        except:
+                            pass
+                        
                         if result["is_valid"]:
                             st.success("✅ DATA INTEGRITY VERIFIED - No tampering detected")
                         else:
@@ -294,10 +486,125 @@ def fda_dashboard():
         
         st.markdown("---")
         st.info("💡 **How it works:** Each IoT record is hashed using SHA-256. The verification process recalculates the hash from the stored data and compares it with the original hash. Any data modification will result in a different hash, detecting tampering.")
+    
+    with tab3:
+        st.subheader("🔗 Public Blockchain Explorer")
+        st.markdown("View all blockchain ledgers across the supply chain")
+        
+        # Log audit entry for viewing blockchain
+        try:
+            requests.post(f"{BACKEND_URL}/audit/log", 
+                        json={
+                            "user_email": st.session_state.user_email,
+                            "role": st.session_state.user_role,
+                            "action": "Viewed Blockchain Explorer",
+                            "details": {"timestamp": datetime.now().isoformat()}
+                        },
+                        timeout=5)
+        except:
+            pass
+        
+        # Get all ledgers
+        verify_all = fetch_data("/ledger/verify/all")
+        
+        if verify_all and verify_all.get("verifications"):
+            verifications = verify_all["verifications"]
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Batches", verify_all.get("total_batches", 0))
+            with col2:
+                valid_count = len([v for v in verifications if v["is_valid"]])
+                st.metric("Valid Chains", valid_count)
+            with col3:
+                invalid_count = len([v for v in verifications if not v["is_valid"]])
+                st.metric("Tampered Chains", invalid_count, delta_color="inverse")
+            
+            st.markdown("---")
+            
+            for verification in verifications:
+                status_icon = "✅" if verification["is_valid"] else "❌"
+                with st.expander(f"{status_icon} {verification['batch_id']} - {verification['total_blocks']} blocks", expanded=False):
+                    if verification["is_valid"]:
+                        st.success(f"Blockchain integrity verified - {verification['total_blocks']} blocks")
+                    else:
+                        st.error(f"Tampering detected in blocks: {verification['tampered_blocks']}")
+                    
+                    # Fetch and display ledger
+                    ledger_data = fetch_data(f"/ledger/{verification['batch_id']}")
+                    if ledger_data and ledger_data.get("ledger"):
+                        for idx, block in enumerate(ledger_data["ledger"][:5]):  # Show first 5 blocks
+                            st.write(f"**Block {idx}:** {block['event']} by {block['actor_role']} at {block['timestamp'][:19]}")
+                        
+                        if len(ledger_data["ledger"]) > 5:
+                            st.info(f"... and {len(ledger_data['ledger']) - 5} more blocks")
+        else:
+            st.info("No blockchain data available yet")
+    
+    with tab4:
+        st.subheader("📋 Complete Audit Trail")
+        
+        audit_logs = fetch_data("/audit/logs?limit=100")
+        
+        if audit_logs and audit_logs.get("logs"):
+            logs = audit_logs["logs"]
+            
+            st.metric("Total Audit Entries", len(logs))
+            
+            # Filter options
+            col1, col2 = st.columns(2)
+            with col1:
+                roles = list(set([log["role"] for log in logs]))
+                selected_role = st.selectbox("Filter by Role", ["All"] + roles)
+            with col2:
+                actions = list(set([log["action"] for log in logs]))
+                selected_action = st.selectbox("Filter by Action", ["All"] + actions)
+            
+            # Filter logs
+            filtered_logs = logs
+            if selected_role != "All":
+                filtered_logs = [log for log in filtered_logs if log["role"] == selected_role]
+            if selected_action != "All":
+                filtered_logs = [log for log in filtered_logs if log["action"] == selected_action]
+            
+            # Display logs
+            for log in filtered_logs[:50]:  # Show first 50
+                with st.expander(f"{log['timestamp'][:19]} - {log['action']} by {log['user_email']}", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**User:** {log['user_email']}")
+                        st.write(f"**Role:** {log['role']}")
+                        st.write(f"**Action:** {log['action']}")
+                    with col2:
+                        st.write(f"**Batch ID:** {log.get('batch_id', 'N/A')}")
+                        st.write(f"**Timestamp:** {log['timestamp']}")
+                        st.write(f"**Hash Ref:** {log.get('hash_ref', 'N/A')[:16]}...")
+                    
+                    if log.get('details'):
+                        st.json(log['details'])
+        else:
+            st.info("No audit logs available")
 
 def distributor_dashboard():
     st.title("🚚 Distributor Dashboard")
-    st.markdown("### Shipment Tracking & Monitoring")
+    st.markdown("### Shipment Tracking & Status Management")
+    
+    # Show FDA approved batches
+    all_batch_records = fetch_data("/batch/all")
+    if all_batch_records and all_batch_records.get("batches"):
+        approved_count = len([b for b in all_batch_records["batches"] if b["status"] == "approved"])
+        pending_count = len([b for b in all_batch_records["batches"] if b["status"] == "pending"])
+        rejected_count = len([b for b in all_batch_records["batches"] if b["status"] == "rejected"])
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("✅ FDA Approved", approved_count)
+        with col2:
+            st.metric("⏳ Pending Approval", pending_count)
+        with col3:
+            st.metric("❌ Rejected", rejected_count)
+        
+        st.markdown("---")
     
     batches_data = fetch_data("/batches")
     
@@ -315,31 +622,89 @@ def distributor_dashboard():
             st.metric("Avg Temperature", f"{avg_temp:.1f}°C")
         
         st.markdown("---")
-        st.subheader("📦 Active Shipments")
+        st.subheader("📦 Manage Shipments")
         
         for batch in batches:
-            with st.expander(f"📦 {batch['batch_id']} - {batch['location']}", expanded=False):
-                col1, col2, col3 = st.columns(3)
+            # Get current status
+            try:
+                status_response = requests.get(f"{BACKEND_URL}/batch/{batch['batch_id']}/status", timeout=5)
+                current_status = status_response.json().get("current_status", "Created") if status_response.status_code == 200 else "Created"
+            except:
+                current_status = "Created"
+            
+            # Status badge
+            status_emoji = {"Created": "📝", "Picked Up": "📦", "In Transit": "🚛", "Delivered": "✅"}
+            status_color = {"Created": "🔵", "Picked Up": "🟡", "In Transit": "🟠", "Delivered": "🟢"}
+            
+            with st.expander(f"{status_emoji.get(current_status, '📦')} {batch['batch_id']} - Status: {current_status}", expanded=False):
+                col1, col2 = st.columns([2, 1])
+                
                 with col1:
-                    temp_status = "✅" if 2 <= batch['latest_temperature'] <= 8 else "⚠️"
-                    st.metric("Temperature", f"{batch['latest_temperature']}°C", 
-                             delta=None if 2 <= batch['latest_temperature'] <= 8 else "Out of range")
+                    # Batch info
+                    subcol1, subcol2, subcol3 = st.columns(3)
+                    with subcol1:
+                        temp_status = "✅" if 2 <= batch['latest_temperature'] <= 8 else "⚠️"
+                        st.metric("Temperature", f"{batch['latest_temperature']}°C", 
+                                 delta=None if 2 <= batch['latest_temperature'] <= 8 else "Out of range")
+                    with subcol2:
+                        st.metric("Humidity", f"{batch['latest_humidity']}%")
+                    with subcol3:
+                        st.metric("Total Records", batch['record_count'])
+                    
+                    st.write(f"**Location:** {batch['location']}")
+                    st.write(f"**Last Update:** {batch['last_update']}")
+                
                 with col2:
-                    st.metric("Humidity", f"{batch['latest_humidity']}%")
-                with col3:
-                    st.metric("Total Records", batch['record_count'])
+                    st.markdown("### Update Status")
+                    new_status = st.selectbox(
+                        "Change Status",
+                        ["Created", "Picked Up", "In Transit", "Delivered"],
+                        index=["Created", "Picked Up", "In Transit", "Delivered"].index(current_status),
+                        key=f"status_{batch['batch_id']}"
+                    )
+                    
+                    if st.button("Update Status", key=f"btn_{batch['batch_id']}", use_container_width=True):
+                        try:
+                            response = requests.post(
+                                f"{BACKEND_URL}/batch/status",
+                                json={
+                                    "batch_id": batch['batch_id'],
+                                    "status": new_status,
+                                    "updated_by": "Distributor"
+                                },
+                                timeout=10
+                            )
+                            if response.status_code == 200:
+                                st.success(f"✅ Status updated to: {new_status}")
+                                st.rerun()
+                            else:
+                                st.error("Failed to update status")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
                 
-                st.write(f"**Location:** {batch['location']}")
-                st.write(f"**Last Update:** {batch['last_update']}")
-                
+                # Live IoT Data Table
+                st.markdown("### 📊 Live IoT Readings")
                 batch_detail = fetch_data(f"/iot/data/{batch['batch_id']}")
                 if batch_detail and batch_detail.get("data"):
                     df = pd.DataFrame(batch_detail["data"])
                     df['timestamp'] = pd.to_datetime(df['timestamp'])
                     
+                    # Filter out status update records
+                    df_filtered = df[~df['sensor_id'].str.contains("STATUS_UPDATE", na=False)]
+                    
+                    # Highlight alerts
+                    def highlight_alerts(row):
+                        if row['temperature'] < 2 or row['temperature'] > 8:
+                            return ['background-color: #ff4444; color: white'] * len(row)
+                        return [''] * len(row)
+                    
+                    display_df = df_filtered[['timestamp', 'temperature', 'humidity', 'location', 'sensor_id']].head(10)
+                    st.dataframe(display_df, use_container_width=True, height=300)
+                    
+                    # Temperature chart
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df['timestamp'], y=df['temperature'], 
-                                            mode='lines+markers', name='Temperature'))
+                    fig.add_trace(go.Scatter(x=df_filtered['timestamp'], y=df_filtered['temperature'], 
+                                            mode='lines+markers', name='Temperature', line=dict(color='#FF6B6B')))
                     fig.add_hline(y=8, line_dash="dash", line_color="red")
                     fig.add_hline(y=2, line_dash="dash", line_color="blue")
                     fig.update_layout(title=f"Temperature History - {batch['batch_id']}",
@@ -351,8 +716,11 @@ def distributor_dashboard():
 
 def pharmacy_dashboard():
     st.title("💊 Pharmacy Dashboard")
-    st.markdown("### Batch Verification & Quality Control")
+    st.markdown("### Batch Verification & Authenticity Check")
     
+    st.markdown("---")
+    
+    # Batch Verification Section
     st.subheader("🔍 Verify Received Batch")
     
     batches_data = fetch_data("/batches")

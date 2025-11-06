@@ -1,0 +1,15 @@
+# Backend
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-dotenv==1.0.0
+supabase==2.0.3
+requests==2.31.0
+
+# Frontend
+streamlit==1.28.2
+plotly==5.18.0
+pandas==2.1.3
+
+# Utilities
+python-dateutil==2.8.2
