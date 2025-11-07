@@ -495,10 +495,13 @@ async def get_pending_batches():
 async def get_all_batch_records():
     try:
         supabase = get_supabase_client()
-        result = supabase.table("batches").select("*").order("created_at", desc=True).execute()
-        return {"status": "success", "batches": result.data, "count": len(result.data)}
+        # Add limit to prevent timeout on large datasets
+        result = supabase.table("batches").select("*").order("created_at", desc=True).limit(100).execute()
+        return {"status": "success", "batches": result.data if result.data else [], "count": len(result.data) if result.data else 0}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error in get_all_batch_records: {str(e)}")
+        # Return empty result instead of error to prevent dashboard crashes
+        return {"status": "error", "batches": [], "count": 0, "error": str(e)}
 
 @app.post("/batch/approve")
 async def approve_or_reject_batch(approval: BatchApproval):

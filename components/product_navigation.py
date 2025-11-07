@@ -275,17 +275,17 @@ def manufacturer_navigation_tab(user_email, batch_ids):
     st.markdown("### 🗺️ Current Route")
     
     try:
-        response = requests.get(f"{BACKEND_URL}/shipment/routes/{selected_batch}", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/shipment/routes/{selected_batch}", timeout=10)
         if response.status_code == 200:
             routes_data = response.json().get("routes", [])
             
             if routes_data:
-                # Show map
+                # Show map with reduced height
                 route_map = create_route_map(routes_data)
-                st_folium(route_map, width=700, height=500)
+                st_folium(route_map, width=700, height=400, returned_objects=[])
                 
-                # Show route details
-                st.markdown("#### Route History")
+                # Show route details immediately after map (no gap)
+                st.markdown("#### 📋 Route History")
                 for idx, route in enumerate(routes_data):
                     with st.expander(f"Route {idx+1}: {route['from_address'][:40]}... → {route['to_address'][:40]}...", expanded=(idx == len(routes_data)-1)):
                         col1, col2, col3 = st.columns(3)
@@ -301,7 +301,7 @@ def manufacturer_navigation_tab(user_email, batch_ids):
                         st.write(f"**Updated:** {route['created_at'][:19]}")
                         st.write(f"**By:** {route['updated_by']}")
             else:
-                st.info("No routes created yet. Use the form above to create the first route.")
+                st.info("📍 No routes created yet. Use the form above to create the first route.")
     except Exception as e:
         st.error(f"Error loading routes: {str(e)}")
 
@@ -455,17 +455,17 @@ def distributor_navigation_tab(user_email, batch_ids):
     st.markdown("### 🗺️ Complete Journey")
     
     try:
-        response = requests.get(f"{BACKEND_URL}/shipment/routes/{selected_batch}", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/shipment/routes/{selected_batch}", timeout=10)
         if response.status_code == 200:
             routes_data = response.json().get("routes", [])
             
             if routes_data:
-                # Show map
+                # Show map with reduced height
                 route_map = create_route_map(routes_data)
-                st_folium(route_map, width=700, height=500)
+                st_folium(route_map, width=700, height=400, returned_objects=[])
                 
-                # Show route details
-                st.markdown("#### Route History")
+                # Show route details immediately after map
+                st.markdown("#### 📋 Route History")
                 for idx, route in enumerate(routes_data):
                     with st.expander(f"Leg {idx+1}: {route['from_address'][:40]}... → {route['to_address'][:40]}...", expanded=(idx == len(routes_data)-1)):
                         col1, col2, col3 = st.columns(3)
@@ -533,9 +533,9 @@ def fda_navigation_tab(batch_ids):
             routes_data = response.json().get("routes", [])
             
             if routes_data:
-                # Show map
+                # Show map with reduced height
                 route_map = create_route_map(routes_data)
-                st_folium(route_map, width=700, height=500)
+                st_folium(route_map, width=700, height=400, returned_objects=[])
                 
                 # Show route details in table format
                 st.markdown("#### Route Details")
@@ -584,7 +584,7 @@ def pharmacy_navigation_tab(batch_ids):
                 # Show complete journey map
                 st.markdown("### 🗺️ Complete Supply Chain Journey")
                 route_map = create_route_map(routes_data)
-                st_folium(route_map, width=700, height=600)
+                st_folium(route_map, width=700, height=450, returned_objects=[])
                 
                 # Show timeline
                 st.markdown("### 📅 Journey Timeline")
