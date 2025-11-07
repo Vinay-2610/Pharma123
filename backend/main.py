@@ -6,7 +6,14 @@ from datetime import datetime
 import hashlib
 import json
 import asyncio
+import requests
+import os
+from dotenv import load_dotenv
 from backend.supabase_config import get_supabase_client
+
+# Load environment variables
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 app = FastAPI(title="PharmaChain API", version="1.0.0")
 
@@ -17,6 +24,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Google Maps API Helper Functions
+def get_coordinates():
+    """Fetch approximate coordinates using Google Geolocation API"""
+    if not GOOGLE_API_KEY:
+        return None, None
+    try:
+        res = requests.post(
+            f"https://www.googleapis.com/geolocation/v1/geolocate?key={GOOGLE_API_KEY}",
+            timeout=5
+        )
+        data = res.json()
+        if "location" in data:
+            return data["location"]["lat"], data["location"]["lng"]
+        return None, None
+    except:
+        return None, None
+
+def get_place_name(lat, lng):
+    """Convert coordinates into a readable address using Geocoding API"""
+    if not GOOGLE_API_KEY:
+        return f"Location ({lat:.4f}, {lng:.4f})"
+    try:
+        res = requests.get(
+            f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={GOOGLE_API_KEY}",
+            timeout=5
+        )
+        data = res.json()
+        
+        # Check for API errors
+        if data.get("status") == "REQUEST_DENIED":
+            print(f"Geocoding API Error: {data.get('error_message', 'API not enabled')}")
+            return f"Location ({lat:.4f}, {lng:.4f}) - Enable Geocoding API"
+        
+        if data.get("results"):
+            return data["results"][0]["formatted_address"]
+        
+        # Fallback with coordinates
+        return f"Location ({lat:.4f}, {lng:.4f})"
+    except Exception as e:
+        print(f"Geocoding error: {str(e)}")
+        return f"Location ({lat:.4f}, {lng:.4f})"
+
+def get_route_directions(origin, destination):
+    """Fetch the driving route between two coordinates using Directions API"""
+    if not GOOGLE_API_KEY:
+        return {"error": "Google API key not configured"}
+    try:
+        url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin}&destination={destination}&key={GOOGLE_API_KEY}"
+        res = requests.get(url, timeout=10)
+        return res.json()
+    except:
+        return {"error": "Failed to fetch route"}
 
 class IoTData(BaseModel):
     batch_id: str
@@ -85,11 +145,30 @@ async def receive_iot_data(data: IoTData):
         if not data.timestamp:
             data.timestamp = datetime.utcnow().isoformat()
         
+        # Auto-detect location if "Auto-Detected" is sent
+        location = data.location
+        if location == "Auto-Detected":
+            if GOOGLE_API_KEY:
+                lat, lng = get_coordinates()
+                if lat and lng:
+                    address = get_place_name(lat, lng)
+                    # Only add coordinates if address doesn't already contain them
+                    if "(" not in address:
+                        location = f"{address} ({lat:.4f}, {lng:.4f})"
+                    else:
+                        location = address
+                else:
+                    # Fallback when API call fails
+                    location = "Location Detection Failed (Check API Key)"
+            else:
+                # Fallback when API key is not configured
+                location = "Auto-Detection Disabled (Configure GOOGLE_API_KEY)"
+        
         data_dict = {
             "batch_id": data.batch_id,
             "temperature": data.temperature,
             "humidity": data.humidity,
-            "location": data.location,
+            "location": location,  # Use processed location
             "sensor_id": data.sensor_id,
             "timestamp": data.timestamp
         }
@@ -681,6 +760,336 @@ async def acknowledge_alert(alert_id: int, user_email: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/route")
+async def get_shipment_route(origin: str = "Chennai, Tamil Nadu", destination: str = "Bengaluru, Karnataka"):
+    """Get live route between origin and destination using Google Directions API"""
+    try:
+        route_data = get_route_directions(origin, destination)
+        return {
+            "status": "success",
+            "origin": origin,
+            "destination": destination,
+            "route": route_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/geocode")
+async def geocode_location(address: str):
+    """Convert address to coordinates"""
+    if not GOOGLE_API_KEY:
+        raise HTTPException(status_code=500, detail="Google API key not configured")
+    try:
+        res = requests.get(
+            f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={GOOGLE_API_KEY}",
+            timeout=5
+        )
+        data = res.json()
+        if data.get("results"):
+            location = data["results"][0]["geometry"]["location"]
+            return {
+                "status": "success",
+                "address": address,
+                "lat": location["lat"],
+                "lng": location["lng"],
+                "formatted_address": data["results"][0]["formatted_address"]
+            }
+        raise HTTPException(status_code=404, detail="Location not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "PharmaChain Backend"}
+    return {"status": "healthy", "service": "PharmaChain Backend", "google_maps": "enabled" if GOOGLE_API_KEY else "disabled"}
+
+
+# ============================================================================
+# PRODUCT NAVIGATION / SHIPMENT ROUTES FEATURE
+# ============================================================================
+
+class ShipmentRoute(BaseModel):
+    batch_id: str
+    from_address: str
+    to_address: str
+    updated_by: str
+
+class RouteUpdate(BaseModel):
+    batch_id: str
+    status: str  # "in_transit", "delivered", "cancelled"
+    updated_by: str
+
+def geocode_address(address: str):
+    """Convert address to coordinates using Google Geocoding API"""
+    if not GOOGLE_API_KEY:
+        return None, None
+    try:
+        res = requests.get(
+            f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={GOOGLE_API_KEY}",
+            timeout=5
+        )
+        data = res.json()
+        if data.get("results"):
+            location = data["results"][0]["geometry"]["location"]
+            return location["lat"], location["lng"]
+        return None, None
+    except:
+        return None, None
+
+def get_route_directions(origin_lat, origin_lng, dest_lat, dest_lng):
+    """Get route details using Google Directions API"""
+    if not GOOGLE_API_KEY:
+        return None
+    try:
+        url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin_lat},{origin_lng}&destination={dest_lat},{dest_lng}&key={GOOGLE_API_KEY}"
+        res = requests.get(url, timeout=10)
+        data = res.json()
+        
+        if data.get("status") == "OK" and data.get("routes"):
+            route = data["routes"][0]
+            leg = route["legs"][0]
+            
+            return {
+                "distance": leg["distance"]["text"],
+                "duration": leg["duration"]["text"],
+                "polyline": route["overview_polyline"]["points"],
+                "start_address": leg["start_address"],
+                "end_address": leg["end_address"]
+            }
+        return None
+    except Exception as e:
+        print(f"Directions API error: {str(e)}")
+        return None
+
+@app.post("/shipment/route")
+async def create_or_update_shipment_route(route: ShipmentRoute):
+    """
+    Create or update a shipment route for a batch
+    - Geocodes addresses to coordinates
+    - Calculates route using Google Directions API
+    - Stores in Supabase shipment_routes table
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # Geocode from address
+        from_lat, from_lng = geocode_address(route.from_address)
+        if not from_lat or not from_lng:
+            raise HTTPException(status_code=400, detail="Could not geocode 'from' address")
+        
+        # Geocode to address
+        to_lat, to_lng = geocode_address(route.to_address)
+        if not to_lat or not to_lng:
+            raise HTTPException(status_code=400, detail="Could not geocode 'to' address")
+        
+        # Get route directions
+        directions = get_route_directions(from_lat, from_lng, to_lat, to_lng)
+        if not directions:
+            raise HTTPException(status_code=400, detail="Could not calculate route")
+        
+        # Prepare route data
+        route_data = {
+            "batch_id": route.batch_id,
+            "from_address": directions["start_address"],
+            "to_address": directions["end_address"],
+            "from_lat": from_lat,
+            "from_lng": from_lng,
+            "to_lat": to_lat,
+            "to_lng": to_lng,
+            "distance": directions["distance"],
+            "duration": directions["duration"],
+            "polyline": directions["polyline"],
+            "status": "in_transit",
+            "updated_by": route.updated_by,
+            "last_updated": datetime.utcnow().isoformat()
+        }
+        
+        # Insert into Supabase
+        result = supabase.table("shipment_routes").insert(route_data).execute()
+        
+        # Log to audit trail
+        log_audit(
+            user_email=route.updated_by,
+            role="System",
+            action="Created Shipment Route",
+            batch_id=route.batch_id,
+            details={
+                "from": directions["start_address"],
+                "to": directions["end_address"],
+                "distance": directions["distance"],
+                "duration": directions["duration"]
+            }
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Route created for batch {route.batch_id}",
+            "data": result.data[0] if result.data else None,
+            "route_details": {
+                "distance": directions["distance"],
+                "duration": directions["duration"],
+                "from": directions["start_address"],
+                "to": directions["end_address"]
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/shipment/routes/{batch_id}")
+async def get_shipment_routes(batch_id: str):
+    """
+    Get all route entries for a specific batch
+    Returns the complete journey timeline
+    """
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table("shipment_routes").select("*").eq("batch_id", batch_id).order("created_at", desc=False).execute()
+        
+        return {
+            "status": "success",
+            "batch_id": batch_id,
+            "routes": result.data,
+            "count": len(result.data)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/shipment/route/latest/{batch_id}")
+async def get_latest_shipment_route(batch_id: str):
+    """
+    Get the most recent route entry for a batch
+    """
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table("shipment_routes").select("*").eq("batch_id", batch_id).order("created_at", desc=True).limit(1).execute()
+        
+        if not result.data:
+            return {
+                "status": "success",
+                "batch_id": batch_id,
+                "route": None,
+                "message": "No route data found for this batch"
+            }
+        
+        return {
+            "status": "success",
+            "batch_id": batch_id,
+            "route": result.data[0]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/shipment/route/status")
+async def update_route_status(update: RouteUpdate):
+    """
+    Update the status of the latest route for a batch
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # Get the latest route
+        result = supabase.table("shipment_routes").select("*").eq("batch_id", update.batch_id).order("created_at", desc=True).limit(1).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="No route found for this batch")
+        
+        route_id = result.data[0]["id"]
+        
+        # Update status
+        update_data = {
+            "status": update.status,
+            "last_updated": datetime.utcnow().isoformat()
+        }
+        
+        updated = supabase.table("shipment_routes").update(update_data).eq("id", route_id).execute()
+        
+        # Log to audit trail
+        log_audit(
+            user_email=update.updated_by,
+            role="System",
+            action="Updated Route Status",
+            batch_id=update.batch_id,
+            details={"new_status": update.status}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Route status updated to {update.status}",
+            "data": updated.data[0] if updated.data else None
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/shipment/route/verify/{batch_id}")
+async def verify_route_integrity(batch_id: str):
+    """
+    Verify route data integrity for FDA dashboard
+    Checks if route data is consistent and valid
+    """
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table("shipment_routes").select("*").eq("batch_id", batch_id).order("created_at", desc=False).execute()
+        
+        if not result.data:
+            return {
+                "status": "success",
+                "batch_id": batch_id,
+                "is_valid": False,
+                "message": "No route data found",
+                "total_routes": 0
+            }
+        
+        routes = result.data
+        is_valid = True
+        issues = []
+        
+        # Check for data consistency
+        for i, route in enumerate(routes):
+            # Check if required fields are present
+            if not route.get("from_address") or not route.get("to_address"):
+                is_valid = False
+                issues.append(f"Route {i+1}: Missing address data")
+            
+            if not route.get("distance") or not route.get("duration"):
+                is_valid = False
+                issues.append(f"Route {i+1}: Missing distance/duration data")
+            
+            # Check if next route starts where previous ended
+            if i > 0:
+                prev_route = routes[i-1]
+                # This is a soft check - addresses might be slightly different
+                # but coordinates should be close
+                if route.get("from_lat") and prev_route.get("to_lat"):
+                    lat_diff = abs(route["from_lat"] - prev_route["to_lat"])
+                    lng_diff = abs(route["from_lng"] - prev_route["to_lng"])
+                    if lat_diff > 0.1 or lng_diff > 0.1:  # ~11km tolerance
+                        issues.append(f"Route {i+1}: Discontinuous journey detected")
+        
+        return {
+            "status": "success",
+            "batch_id": batch_id,
+            "is_valid": is_valid,
+            "total_routes": len(routes),
+            "issues": issues if not is_valid else [],
+            "message": "Route integrity verified" if is_valid else "Route integrity issues detected",
+            "routes_summary": [
+                {
+                    "from": r["from_address"],
+                    "to": r["to_address"],
+                    "distance": r["distance"],
+                    "duration": r["duration"],
+                    "timestamp": r["created_at"]
+                }
+                for r in routes
+            ]
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

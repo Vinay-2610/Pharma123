@@ -6,7 +6,6 @@ from datetime import datetime
 BACKEND_URL = "http://localhost:8000"
 
 BATCH_IDS = ["BATCH-2025-001", "BATCH-2025-002", "BATCH-2025-003", "BATCH-2025-004"]
-LOCATIONS = ["Manufacturing Plant", "Warehouse A", "Distribution Center", "In Transit", "Pharmacy Storage"]
 SENSOR_IDS = ["SENSOR-001", "SENSOR-002", "SENSOR-003", "SENSOR-004", "SENSOR-005"]
 
 def generate_sensor_reading():
@@ -23,7 +22,7 @@ def generate_sensor_reading():
         "batch_id": random.choice(BATCH_IDS),
         "temperature": temperature,
         "humidity": humidity,
-        "location": random.choice(LOCATIONS),
+        "location": "Auto-Detected",  # Backend will fetch real location using Google Geolocation API
         "sensor_id": random.choice(SENSOR_IDS),
         "timestamp": datetime.utcnow().isoformat()
     }
