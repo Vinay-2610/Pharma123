@@ -1,318 +1,293 @@
-# 🏥 PharmaChain - IoT + Blockchain Pharmaceutical Supply Chain System
+# 🏥 PharmaChain - IoT + Blockchain + Google Maps Integrated Supply Chain System
 
-A full-stack AI-powered IoT and Blockchain-based pharmaceutical supply chain monitoring system with real-time tracking, FDA compliance workflows, and tamper detection.
-
-## 🎯 Project Overview
-
-PharmaChain is an end-to-end pharmaceutical supply chain traceability system that combines:
-- **IoT Sensors** for real-time temperature and humidity monitoring
-- **Blockchain-style Ledger** for immutable audit trails
-- **FDA Compliance Workflows** with digital approval processes
-- **Multi-stakeholder Dashboards** for complete transparency
-- **Tamper Detection** using cryptographic hashing
-
-## ✨ Key Features
-
-### 1. 🔗 Blockchain Ledger
-- Complete chain of custody tracking
-- SHA-256 hash chaining for immutability
-- Tamper detection and verification
-- Public blockchain explorer
-- 41+ blockchain entries auto-created
-
-### 2. 🌡️ IoT Monitoring
-- Real-time temperature and humidity tracking
-- 1,252+ sensor readings collected
-- Location-based monitoring
-- Automatic alert generation
-- Safe range: 2-8°C for pharmaceuticals
-
-### 3. 👥 Multi-Role Dashboards
-- **Manufacturer**: Create batches, view analytics
-- **FDA**: Approve/reject batches, verify blockchain
-- **Distributor**: Track shipments, update status
-- **Pharmacy**: Verify batch quality, check compliance
-
-### 4. ✅ FDA Compliance
-- Digital approval/rejection workflow
-- Mandatory FDA review before distribution
-- Remarks and timestamp tracking
-- Complete audit trail
-- Multi-party verification
-
-### 5. ⚠️ Tamper Detection & Alerts
-- 113+ temperature alerts generated
-- Blockchain hash verification
-- Severity levels (High/Medium/Low)
-- Real-time alert system
-- Alert acknowledgment tracking
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│   Streamlit     │  ← Frontend (Multi-role dashboards)
-│   Dashboard     │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│    FastAPI      │  ← Backend (REST API + WebSocket)
-│    Backend      │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│   Supabase      │  ← Database + Auth + Realtime
-│   PostgreSQL    │
-└─────────────────┘
-         ▲
-         │
-┌────────┴────────┐
-│  IoT Simulator  │  ← Sends sensor data every 5-6 seconds
-└─────────────────┘
-```
-
-## 🛠️ Tech Stack
-
-- **Backend**: FastAPI (Python 3.13)
-- **Frontend**: Streamlit
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Visualization**: Plotly, Pandas
-- **Blockchain**: SHA-256 hashing
-- **IoT**: Python simulator (ESP32 compatible)
-
-## 📦 Installation
-
-### Prerequisites
-- Python 3.13+
-- Supabase account
-- Git
-
-### Setup
-
-1. **Clone the repository**
-```bash
-git clone <your-repo-url>
-cd Pharma123
-```
-
-2. **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-3. **Configure Supabase**
-- Create a Supabase project at https://supabase.com
-- Run the SQL scripts in order:
-  - `enhanced_schema.sql` (creates all tables)
-- Copy your credentials
-
-4. **Set environment variables**
-Create a `.env` file:
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-```
-
-5. **Create database tables**
-Run the SQL scripts in Supabase SQL Editor:
-- `enhanced_schema.sql`
-- `create_batches_table.sql`
-
-## 🚀 Running the Application
-
-### Terminal 1: Backend
-```bash
-cd Pharma123
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Terminal 2: Frontend
-```bash
-cd Pharma123
-streamlit run app.py --server.port 5000
-```
-
-### Terminal 3: IoT Simulator
-```bash
-cd Pharma123
-python simulator/send_data.py
-```
-
-### Access the Application
-- **Frontend**: http://localhost:5000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-
-## 👤 User Roles & Login
-
-### Manufacturer
-- **Email**: fda@pharmachain.com
-- **Password**: 123456
-- **Features**: Create batches, view IoT analytics
-
-### FDA
-- **Email**: babu@pharmachain.com
-- **Password**: 123456
-- **Features**: Approve/reject batches, blockchain explorer, audit logs
-
-### Distributor
-- Create new account with role "Distributor"
-- **Features**: Track shipments, update status
-
-### Pharmacy
-- Create new account with role "Pharmacy"
-- **Features**: Verify batches, check quality
-
-## 📊 Database Schema
-
-### Core Tables
-- `iot_data` - IoT sensor readings (1,252+ records)
-- `batches` - Batch information and FDA approval status
-- `alerts` - Temperature violation alerts (113+ records)
-- `user_profiles` - User accounts with roles
-
-### Blockchain & Audit
-- `ledger` - Blockchain-style event log (41+ blocks)
-- `alerts_log` - Real-time alert tracking
-- `audit_logs` - Complete user action history
-- `signatures` - Multi-party verification
-
-### Optional
-- `shipments` - Enhanced shipment tracking
-- `vehicle_telemetry` - Vehicle health monitoring
-
-## 🔐 Security Features
-
-1. **Blockchain Immutability**: Hash chaining prevents tampering
-2. **Audit Trail**: Every action logged with timestamps
-3. **Role-Based Access**: Different permissions per role
-4. **Digital Signatures**: FDA approval tracking
-5. **Tamper Detection**: Automatic hash verification
-
-## 📈 API Endpoints
-
-### IoT Data
-- `POST /iot/data` - Receive sensor data
-- `GET /iot/data` - Get all readings
-- `GET /iot/data/{batch_id}` - Get batch readings
-
-### Batch Management
-- `POST /batch/create` - Create new batch
-- `GET /batch/pending` - Get pending approvals
-- `POST /batch/approve` - Approve/reject batch
-- `GET /batch/all` - Get all batches
-
-### Blockchain
-- `POST /ledger/add` - Add ledger entry
-- `GET /ledger/{batch_id}` - Get batch ledger
-- `GET /ledger/verify/all` - Public blockchain explorer
-
-### Audit & Alerts
-- `POST /audit/log` - Create audit log
-- `GET /audit/logs` - Get audit trail
-- `GET /alerts/realtime` - Get active alerts
-- `POST /alerts/acknowledge/{id}` - Acknowledge alert
-
-## 🎯 Project Objectives (All Implemented ✅)
-
-1. ✅ **Digital Ledger** - End-to-end drug traceability
-2. ✅ **IoT Integration** - Environmental condition monitoring
-3. ✅ **Traceability Dashboard** - All stakeholder visibility
-4. ✅ **FDA Compliance** - Digital approval workflows
-5. ✅ **Tamper Detection** - IoT log-based alerts
-
-## 📝 Documentation
-
-- `WORKFLOW_GUIDE.md` - Complete workflow documentation
-- `REALTIME_FEATURES.md` - Real-time features guide
-- `AUDIT_LOGGING_GUIDE.md` - Audit logging documentation
-- `OBJECTIVES_STATUS.md` - Project objectives status
-
-## 🧪 Testing
-
-### Verify Tables
-```bash
-python verify_tables.py
-```
-
-### Test Audit Logging
-```bash
-python test_audit_logging.py
-```
-
-### Test Database Connection
-```bash
-python test_connection.py
-```
-
-## 📊 Current Metrics
-
-- **Blockchain Entries**: 41+ blocks
-- **IoT Readings**: 1,252+ records
-- **Alerts Generated**: 113+ alerts
-- **Batches Tracked**: 4+ batches
-- **Registered Users**: 11 users
-- **API Endpoints**: 20+ endpoints
-- **Database Tables**: 10 tables
-
-## 🔄 Workflow Example
-
-```
-1. Manufacturer creates batch
-   ↓
-2. Batch status: PENDING
-   ↓
-3. FDA reviews batch details
-   ↓
-4. FDA approves with remarks
-   ↓
-5. Batch status: APPROVED
-   ↓
-6. Distributor picks up batch
-   ↓
-7. IoT sensors monitor during transit
-   ↓
-8. Temperature alerts if out of range
-   ↓
-9. Pharmacy receives and verifies
-   ↓
-10. Complete blockchain audit trail
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 👨‍💻 Author
-
-Created as part of an IoT + Blockchain pharmaceutical supply chain project.
-
-## 🙏 Acknowledgments
-
-- Supabase for database and authentication
-- Streamlit for rapid dashboard development
-- FastAPI for high-performance backend
-- Plotly for interactive visualizations
-
-## 📞 Support
-
-For issues or questions:
-1. Check the documentation files
-2. Review API docs at `/docs`
-3. Check audit logs for errors
-4. Verify database tables exist
+A full-stack AI-powered **IoT, Blockchain, and Geolocation-based Pharmaceutical Supply Chain Monitoring System** with real-time temperature tracking, route visualization, offline data resilience, and FDA-compliant approval workflows.
 
 ---
 
-**Status**: Production Ready ✅  
-**Last Updated**: November 2025  
-**Version**: 1.0.0
+## 🎯 Project Overview
+PharmaChain ensures **end-to-end visibility and authenticity** of pharmaceutical products from manufacturing to delivery using:
+- 🌡️ IoT sensors (ESP32 + DHT11) for real-time environmental tracking  
+- 🌍 Google Maps APIs for live location, route mapping, and navigation tracking  
+- 🔗 Blockchain-style ledger for immutable event records  
+- 🧾 FDA workflow compliance with digital approvals and audit logs  
+- ⚙️ SPIFFS-based offline data storage ensuring zero data loss  
+
+---
+
+## ✨ Key Features
+
+### 1️⃣ 🔗 Blockchain Ledger
+- Tamper-proof supply chain records using SHA-256 hash chaining  
+- Ledger stored in Supabase (`ledger` table) for full transparency  
+- Verification endpoints ensure data authenticity (`/verify`, `/ledger/verify/all`)  
+- Public blockchain explorer to audit every transaction  
+
+---
+
+### 2️⃣ 🌡️ IoT Monitoring + SPIFFS Offline Support
+- **ESP32 + DHT11 Sensor** records temperature and humidity every 5 minutes  
+- Readings are POSTed to FastAPI backend (`/iot/data`)  
+- If Wi-Fi disconnects:
+  - Data is cached locally in **SPIFFS** (`/failed_data.json`)  
+  - When Wi-Fi reconnects, ESP32 auto-uploads all unsent data:  
+    ```
+    ✅ SPIFFS mounted successfully  
+    📤 Uploading stored offline data...  
+    ✅ Uploaded offline record, code 200  
+    🧹 Cleared offline data after upload.
+    ```
+- Guarantees **100% data persistence**, even in unstable networks  
+
+---
+
+### 3️⃣ 🗺️ Google Maps Integration (Real-Time Location)
+- Uses the following Google APIs:
+  - **Geolocation API** → Detects current coordinates of ESP32  
+  - **Geocoding API** → Converts coordinates into readable addresses  
+  - **Directions API** → Calculates optimized route between locations  
+  - **Maps JavaScript API** → Displays interactive live route maps in dashboard  
+- Automatically updates **location**, **latitude**, and **longitude** in Supabase  
+- Every user dashboard (Manufacturer, Distributor, FDA, Pharmacy) displays:  
+  - Real-time **temperature + location**  
+  - Route visualization (“From” → “To”) updated every 5 minutes  
+  - Delivery navigation panel under “Product Navigation” section  
+
+---
+
+### 4️⃣ 👥 Multi-Role Dashboards
+| Role | Responsibilities |
+|------|------------------|
+| 🏭 **Manufacturer** | Creates batches, views temperature & route updates |
+| 🧪 **FDA** | Approves/rejects batches, validates blockchain integrity |
+| 🚚 **Distributor** | Updates shipment routes and monitors IoT conditions |
+| 💊 **Pharmacy** | Verifies final product condition and authenticity |
+
+Each dashboard auto-fetches:
+- Latest temperature readings  
+- Live GPS location and route updates  
+- Alerts if temperature exceeds safe range (20°C–30°C)  
+
+---
+
+### 5️⃣ ✅ FDA Compliance Workflow
+- Digital approval system with remarks & timestamps  
+- Secure hash references for FDA signatures  
+- Audit log maintained in `audit_logs` table  
+- Automated ledger entries for all FDA actions  
+
+---
+
+### 6️⃣ ⚠️ Real-Time Alerts & Tamper Detection
+- Temperature range monitored between **20°C–30°C**  
+- Alerts generated for deviations (`is_alert = true`)  
+- Severity classification:
+  - High (below 15°C or above 35°C)  
+  - Medium (16–34°C)  
+- Alerts displayed in Streamlit UI and Supabase in real-time  
+- Automatic blockchain integrity check for each record  
+
+---
+
+## 🏗️ System Architecture
+
+┌────────────────────────────┐
+│ Manufacturer UI │
+│ Distributor UI │
+│ FDA UI │
+│ Pharmacy UI │
+│ (Streamlit Frontend) │
+└──────────────┬─────────────┘
+│
+▼
+┌────────────────────────────┐
+│ FastAPI Backend │
+│ - IoT Data Receiver │
+│ - Google Maps APIs │
+│ - Blockchain Ledger │
+│ - FDA Workflow Logic │
+└──────────────┬─────────────┘
+│
+▼
+┌────────────────────────────┐
+│ Supabase DB │
+│ - iot_data │
+│ - batches │
+│ - alerts │
+│ - ledger │
+│ - shipment_routes │
+└──────────────┬─────────────┘
+│
+▼
+┌────────────────────────────┐
+│ ESP32 + DHT11 Sensor │
+│ - Temperature/Humidity │
+│ - SPIFFS Offline Storage │
+│ - WiFi Auto-Reconnect │
+│ - Google API Geolocation │
+└────────────────────────────┘
+
+yaml
+Copy code
+
+---
+
+## 🛠️ Tech Stack
+
+| Component | Technology |
+|------------|-------------|
+| **Backend** | FastAPI (Python 3.13) |
+| **Frontend** | Streamlit |
+| **Database** | Supabase (PostgreSQL) |
+| **IoT Device** | ESP32 + DHT11 |
+| **Offline Storage** | SPIFFS (ESP32 internal flash) |
+| **Mapping APIs** | Google Maps: Directions, Geocoding, Geolocation, Maps JS |
+| **Visualization** | Plotly, Pandas |
+| **Blockchain** | SHA-256 Hash Chaining |
+
+---
+
+## ⚙️ Installation
+
+### Prerequisites
+- Python 3.13+  
+- Supabase Account  
+- Google Cloud API Key (enable Geocoding, Geolocation, Directions, Maps JavaScript APIs)  
+- ESP32 Board + DHT11 Sensor  
+
+### Steps
+
+```bash
+# Clone repository
+git clone <your-repo-url>
+cd PharmaChain
+
+# Install dependencies
+pip install -r requirements.txt
+Configure Supabase
+Create a Supabase project and run SQL scripts:
+
+sql
+Copy code
+-- Example: Create IoT Data Table
+CREATE TABLE iot_data (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  batch_id TEXT,
+  temperature FLOAT,
+  humidity FLOAT,
+  location TEXT,
+  latitude FLOAT,
+  longitude FLOAT,
+  sensor_id TEXT,
+  timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+Add Google Maps API Key
+In your .env file:
+
+ini
+Copy code
+GOOGLE_MAPS_API_KEY=your_api_key_here
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+🚀 Running the Application
+Terminal 1: Backend
+
+bash
+Copy code
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+Terminal 2: Frontend
+
+bash
+Copy code
+streamlit run app.py --server.port 5000
+Terminal 3: IoT Device
+
+Upload Arduino code to ESP32
+
+Verify serial monitor shows:
+
+yaml
+Copy code
+✅ Connected to WiFi!
+🌡 Temperature: 26.40 °C | 💧 Humidity: 62.00 %
+POSTing to: http://<your_ip>:8000/iot/data
+✅ Data sent successfully!
+📡 Data Flow
+ESP32 reads temperature & humidity (every 5 mins)
+
+Offline data stored in SPIFFS if Wi-Fi lost
+
+On reconnect, all cached readings auto-uploaded
+
+FastAPI validates data and logs to Supabase
+
+Streamlit dashboard visualizes IoT data & live map route
+
+FDA, Distributor, and Pharmacy dashboards show synced values
+
+🗺️ Product Navigation Workflow
+Manufacturer enters “From” and “To” addresses (auto or manual)
+
+Distributor can update live route if shipment rerouted
+
+FDA and Pharmacy dashboards show real-time navigation and temperature sync
+
+Map auto-refreshes every 5 minutes with updated coordinates
+
+📊 Database Tables
+iot_data → Sensor readings
+
+batches → Batch information & status
+
+ledger → Blockchain event records
+
+alerts → Temperature alerts
+
+shipment_routes → Route info (from, to, distance, ETA)
+
+audit_logs → User action logs
+
+user_profiles → Account roles
+
+🔒 Security & Reliability
+SHA-256 Blockchain Hashing
+
+Role-Based Access Control
+
+FDA Signature Verification
+
+SPIFFS Offline Data Backup
+
+Real-Time Alerting
+
+📈 Metrics
+Blockchain Entries: 40+
+
+IoT Readings: 1200+
+
+Alerts Generated: 100+
+
+Batches Tracked: 5+
+
+Dashboards: 4 Roles
+
+API Endpoints: 20+
+
+🧑‍💻 Author
+Vinay
+IoT + Blockchain + AI Research Enthusiast
+PharmaChain - November 2025, Version 1.0.0
+
+📜 License
+Licensed under the MIT License.
+
+🙏 Acknowledgments
+Supabase → Database + Authentication
+
+FastAPI → High-performance backend
+
+Streamlit → Interactive dashboarding
+
+Google Cloud → Maps and Geolocation APIs
+
+ESP32 → Reliable IoT edge device
+
